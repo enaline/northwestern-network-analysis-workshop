@@ -265,7 +265,7 @@ plot(karate,
 
 c= centr_degree(karate)  ###prints 
 c$res #node-level centrality scores.
-c$centralization #The graph level centrality index. measure of how centralized the network is
+c$centralization #The graph level centrality index. measure of how centralized the network is around some focal nodes. A centralization score of 1 indicates a graph is like a star network, whereas 0 indicates a wheel
 
 ```
 
