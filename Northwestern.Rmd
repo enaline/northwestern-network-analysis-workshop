@@ -1,0 +1,302 @@
+---
+title: "Northwestern University Methods Workshop 2024"
+author: "Basak TARAKTAS"
+date: "2024-03-04"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Defining a network with igraph
+
+Install igraph and igraphdata
+
+```{r}
+#install.packages('igraph')
+#install.packages('igraphdata')
+
+library(igraph)
+library(igraphdata)
+```
+
+## 
+
+### Download files from Github using readr
+
+```{r}
+
+## Set working directory: session > set working directory > choose a folder
+
+library (readr)
+vertices<-"https://raw.githubusercontent.com/enaline/northwestern-network-analysis-workshop/main/vertex_list.csv"
+vertices <- read_csv(url(vertices), col_names = TRUE)
+vertices
+
+
+edgelist<- "https://raw.githubusercontent.com/enaline/northwestern-network-analysis-workshop/main/edgelist.csv"
+data <- read_csv(url(edgelist), col_names = TRUE)
+data
+
+
+friendship<-"https://raw.githubusercontent.com/enaline/northwestern-network-analysis-workshop/main/fr.csv"
+fr <- read_csv(url(friendship), col_names = FALSE)
+fr
+
+```
+
+### Read in files after manual download
+
+```{r}
+
+vertices <- read.csv("vertex_list.csv", header = TRUE)
+data <- read.csv("edgelist.csv", header = TRUE)
+fr <- read.csv("fr.csv", header=T, row.names=1)
+
+
+
+```
+
+## Define a network from an adjacency matrix
+
+```{r}
+
+####Let's save the fr file as a matrix to build the friendship network
+fr<- as.matrix(fr)
+
+net <- graph_from_adjacency_matrix(fr)
+
+plot(net)
+```
+
+Let us visualize
+
+```{r}
+##change vertex color using vertex.color =''
+plot(net, vertex.color = "purple")
+plot(net, vertex.color = "red")
+plot(net, vertex.color = "blue")
+```
+
+## Try with different layouts
+
+```{r}
+
+##try with different layouts to improve visualization
+plot(net, vertex.size=20, layout=layout.fruchterman.reingold(net) )
+plot(net, vertex.size=20, layout=layout_as_star(net))
+plot(net, vertex.size=20, layout=layout_as_tree(net))
+plot(net, vertex.size=20, layout=layout.circle(net))
+plot(net, vertex.size=20, layout=layout.grid(net))
+plot(net, vertex.size=20, layout= layout.kamada.kawai(net))
+
+```
+
+## Define network from an edgelist and vertex list
+
+Great for large datasets
+
+```{r}
+
+##save the edge list as a matrix (do not forget)
+data<- as.matrix(data)
+
+
+###construct the network
+friends <- graph_from_edgelist(data[, 1:2], directed= F)
+
+##Construct a directed network this time
+#friends_dir <- graph_from_edgelist(data[, 1:2], directed= T)
+
+plot(friends)
+
+```
+
+Let us set attributes and visualize
+
+Vertices may have different attributes like observations in a dataset have (e.g., partisanship, gender for respondents in survey data)
+
+```{r}
+###convert tibble into data frame to refer to it when defining attributes
+vertices <- as.data.frame(vertices)
+
+###Define edge attributes: frequency of contact
+E(friends)$frequency <- as.integer(data[,3])
+
+
+###define vertex attributes: gender
+V(friends)$gender <- as.factor(vertices[,2])
+
+
+###You can visualize the network to highlight certain characteristics of interest in those attributes
+plot(friends, 
+     edge.color = ifelse(E(friends)$frequency >= 6, "purple", "green"), ##if contact freq is greater or equal than 6 set edge color to purple and green otherwise
+     vertex.color = ifelse(V(friends)$gender =="nonbinary", "blue", "orange"), ###if the node is of gender male, set vertex color to blue, pink otherwise
+     vertex.shape= ifelse(V(friends)$gender =="male","circle", "square")) ###if the node is of gender male, set vertex shape to blue, pink otherwise
+
+
+```
+
+# Analyzing graph structure
+
+Visualization is not helpful for large graphs. Graph- and node-level metrics alone help us understand the structure of both large and helpful graphs.
+
+For any graph, we want to know
+
+a)  *graph size* (number of edges) & *graph order* (number of nodes)\
+b)  *edge distribution* across the graph to understand whether
+
+-   the graph is highly/sparsely connected
+
+-   edge accumulation predominantly occurs around specific nodes, or if they are relatively evenly distributed throughout the graph
+
+c)  *important nodes*
+
+## Case Study: Zachary's Karate Club
+
+```{r}
+
+###Zachary's karate club is a built-in dataset in the igraphdata package. Activate the package
+library(igraphdata) 
+
+###load data
+data("karate")
+
+
+##plot to get a sense (optional)
+plot(karate)
+
+```
+
+### a) Basic statistics about graph structure
+
+```{r}
+###get the list of vertices
+V(karate) 
+
+
+##get the number of nodes
+gorder(karate) ###also vcount()
+
+###get the number of edges
+gsize(karate)
+
+```
+
+### b.1) Is the Karate Club a highly connected graph?
+
+```{r}
+
+#density
+edge_density(karate)
+```
+
+### b. 2) Are most edges accumulated around certain nodes? Are edges somewhat equally/uniformly distributed across the graph?
+
+#### Degree
+
+```{r}
+##get degree of the vertices in a graph 
+degree(karate)
+
+
+##min, max, mean degree
+max(degree(karate))
+min(degree(karate))
+mean(degree(karate))
+
+
+##let us create a degree object (deg) to use for visualization purposes
+deg<- degree(karate)
+
+###if directed network, specify the mode for in-degrees and out-degrees.
+###Karate is undirected. Let's look at the friendship network instead (see above)
+#deg_fr<- degree(friends_dir, mode="in")
+#deg_fr<- degree(friends_dir, mode="out")
+
+
+
+##get the degree sequence in descending order
+#sort(degree(karate)) ##### sort degrees of each vertex
+#sort(degree(karate), decreasing = FALSE) #### sort in an ascending order
+
+##find the node with max degree
+#which.max(deg) 
+
+
+##Create a histogram
+## hist(deg) 
+hist(deg, breaks=1:vcount(karate)-1, main="Histogram of node degree") ###a cleaner histogram
+##breaks defines the number and width of the bins
+##1:vcount(friends)-1 means that there will be as many bins as the total number of vertices minus one
+
+
+```
+
+Let's create a visual representation of the graph based on vertex degrees.
+
+```{r}
+
+plot(karate, vertex.size = degree(karate)*0.8)
+
+# Set edge color to gray, and the node color to orange.
+# additional settings e.g., edge.arrow.size=.2, edge.curved=0
+
+plot(karate, 
+     vertex.color="purple", 
+     vertex.size=ifelse(degree(karate)>mean(degree(karate)), degree(karate)*0.8, degree(karate)*0.4 ), ###make high degree nodes bigger than others
+     vertex.label.color="black", 
+     vertex.label.cex=.7)
+
+
+```
+
+```{r}
+
+
+```
+
+### c) Centrality: which actors play an important role in this club?
+
+#### c.1. Degree centrality: based on sheer number of connections
+
+```{r}
+
+##### degree centrality
+
+c= centr_degree(karate)  ###prints 
+c$res #node-level centrality scores.
+c$centralization #The graph level centrality index. measure of how centralized the network is
+
+```
+
+#### c.2. Eigenvector centrality: important connections rather than the mere number of connections
+
+```{r}
+eigen_centrality(karate) ####eigenvector centrality
+sort(eigen_centrality(karate)$vector)   #### $vector pulls eigen scores for vertices 
+
+
+
+###which actor has the highest eigenvector centrality
+V(karate)$eigen <- eigen_centrality(karate)$vector ###first define eigen. centrality as a vertex attribute
+which(V(karate)$eigen ==max(V(karate)$eigen)) ##identify that node with the which function
+###notice this returns the index
+
+V(karate)[34] ##this prints out the name of the actor
+
+
+```
+
+#### c.3. Betweenness centrality: Brokers & bridges
+
+```{r}
+betweenness(karate)   #### gives betweenness centrality scores of nodes
+max(betweenness(karate))
+
+
+V(karate)$betweenness <- betweenness(karate)
+
+which(V(karate)$betweenness ==max(betweenness(karate)) )
+
+V(karate)[1]
+```
